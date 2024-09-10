@@ -11,7 +11,8 @@ import Vision
 
 struct BarcodeScannerView: UIViewControllerRepresentable {
     @Binding var detectedISBN: String?
-    @Binding var isPresentingScanner: Bool // Control the sheet dismissal
+    @Binding var isPresentingScanner: Bool
+    @Binding var isScanning: Bool
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let cameraVC = CameraViewController()
@@ -42,9 +43,9 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
                             print("Detected Barcode: \(payloadString)")
                             if self.isISBNBarcode(payloadString) {
                                 DispatchQueue.main.async {
-                                    // Set the detected ISBN and close the scanner
                                     self.parent.detectedISBN = payloadString
-                                    self.parent.isPresentingScanner = false // Close the scanner sheet
+                                    self.parent.isPresentingScanner = false
+                                    self.parent.isScanning = false // Stop scanning after detection
                                 }
                             }
                         }
@@ -56,9 +57,35 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
             try? requestHandler.perform([request])
         }
 
-        // Helper function to check if the barcode is an ISBN
         private func isISBNBarcode(_ payload: String) -> Bool {
             return payload.hasPrefix("978") || payload.hasPrefix("979")
         }
+    }
+}
+
+struct ScannerOverlay: View {
+    var body: some View {
+        ZStack {
+            // Create a rectangular overlay with transparency
+            Rectangle()
+                .fill(Color.black.opacity(0.6))
+                .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+
+            // Define the scanning area (center box)
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(lineWidth: 3)
+                .foregroundColor(.green)
+                .frame(width: 300, height: 150)
+
+            Text("Position the barcode within the box")
+                .foregroundColor(.white)
+                .padding(.top, 200) // Adjust text position
+        }
+    }
+}
+
+struct BarcodeScannerView_Previews: PreviewProvider {
+    static var previews: some View {
+        ScannerOverlay()
     }
 }
