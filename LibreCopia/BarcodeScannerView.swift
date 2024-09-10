@@ -13,6 +13,7 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
     @Binding var detectedISBN: String?
     @Binding var isPresentingScanner: Bool
     @Binding var isScanning: Bool
+    @Binding var showConfirmation: Bool
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let cameraVC = CameraViewController()
@@ -20,7 +21,13 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
         return cameraVC
     }
 
-    func updateUIViewController(_ uiViewController: CameraViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: CameraViewController, context: Context) {
+        if showConfirmation {
+            uiViewController.freezeCamera()
+        } else {
+            uiViewController.unfreezeCamera()
+        }
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -34,7 +41,7 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+            guard !parent.showConfirmation, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
             let request = VNDetectBarcodesRequest { request, error in
                 if let results = request.results as? [VNBarcodeObservation] {
@@ -44,9 +51,10 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
                             if self.isISBNBarcode(payloadString) {
                                 DispatchQueue.main.async {
                                     self.parent.detectedISBN = payloadString
-                                    self.parent.isPresentingScanner = false
-                                    self.parent.isScanning = false // Stop scanning after detection
+                                    self.parent.showConfirmation = true
+                                    self.parent.isScanning = false
                                 }
+                                return
                             }
                         }
                     }
@@ -64,28 +72,52 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
 }
 
 struct ScannerOverlay: View {
+    @Binding var showConfirmation: Bool
+    @Binding var detectedISBN: String?
+    @Binding var isPresentingScanner: Bool
+    
     var body: some View {
         ZStack {
-            // Create a rectangular overlay with transparency
             Rectangle()
                 .fill(Color.black.opacity(0.6))
                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
 
-            // Define the scanning area (center box)
             RoundedRectangle(cornerRadius: 10)
                 .stroke(lineWidth: 3)
                 .foregroundColor(.green)
                 .frame(width: 300, height: 150)
 
-            Text("Position the barcode within the box")
-                .foregroundColor(.white)
-                .padding(.top, 200) // Adjust text position
+            if showConfirmation {
+                VStack {
+                    Text("ISBN Detected: \(detectedISBN ?? "")")
+                        .foregroundColor(.white)
+                        .padding()
+                    
+                    HStack {
+                        Button("Continue Scanning") {
+                            showConfirmation = false
+                        }
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        
+                        Button("Confirm") {
+                            isPresentingScanner = false
+                        }
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                }
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(10)
+            } else {
+                Text("Position the barcode within the box")
+                    .foregroundColor(.white)
+                    .padding(.top, 200)
+            }
         }
-    }
-}
-
-struct BarcodeScannerView_Previews: PreviewProvider {
-    static var previews: some View {
-        ScannerOverlay()
     }
 }

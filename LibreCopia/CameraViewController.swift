@@ -12,6 +12,7 @@ class CameraViewController: UIViewController {
     var captureSession: AVCaptureSession!
     var videoPreviewLayer: AVCaptureVideoPreviewLayer!
     var delegate: AVCaptureVideoDataOutputSampleBufferDelegate?
+    var lastCapturedImage: UIImage?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -38,7 +39,7 @@ class CameraViewController: UIViewController {
 
         // Setup video output
         let videoOutput = AVCaptureVideoDataOutput()
-        videoOutput.setSampleBufferDelegate(delegate, queue: DispatchQueue(label: "videoQueue"))
+        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
         if (captureSession.canAddOutput(videoOutput)) {
             captureSession.addOutput(videoOutput)
         }
@@ -57,5 +58,36 @@ class CameraViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         captureSession.stopRunning()
+    }
+
+    func freezeCamera() {
+        captureSession.stopRunning()
+        if let image = lastCapturedImage {
+            let imageView = UIImageView(image: image)
+            imageView.contentMode = .scaleAspectFill
+            imageView.frame = view.bounds
+            view.addSubview(imageView)
+        }
+    }
+
+    func unfreezeCamera() {
+        view.subviews.forEach { if $0 is UIImageView { $0.removeFromSuperview() } }
+        captureSession.startRunning()
+    }
+}
+
+extension CameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if let delegate = delegate {
+            delegate.captureOutput?(output, didOutput: sampleBuffer, from: connection)
+        }
+        
+        if let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+            let context = CIContext()
+            if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
+                lastCapturedImage = UIImage(cgImage: cgImage)
+            }
+        }
     }
 }

@@ -10,11 +10,11 @@ import SwiftUI
 struct ContentView: View {
     @State private var isPresentingScanner = false
     @State private var detectedISBN: String? = nil
-    @State private var isScanning = false // To indicate the scanning process
+    @State private var isScanning = false
+    @State private var showConfirmation = false
     
     var body: some View {
         VStack {
-            // Display the detected ISBN or a prompt if none detected yet
             if let isbn = detectedISBN {
                 Text("Detected ISBN: \(isbn)")
                     .font(.title)
@@ -28,7 +28,9 @@ struct ContentView: View {
 
             Button(action: {
                 isPresentingScanner = true
-                isScanning = true // Start scanning
+                isScanning = true
+                detectedISBN = nil
+                showConfirmation = false
             }) {
                 Text("Open Camera")
                     .font(.headline)
@@ -40,16 +42,13 @@ struct ContentView: View {
             .padding()
             .sheet(isPresented: $isPresentingScanner) {
                 ZStack {
-                    // Pass the detected ISBN and scanning status to the scanner view
-                    BarcodeScannerView(detectedISBN: $detectedISBN, isPresentingScanner: $isPresentingScanner, isScanning: $isScanning)
+                    BarcodeScannerView(detectedISBN: $detectedISBN, isPresentingScanner: $isPresentingScanner, isScanning: $isScanning, showConfirmation: $showConfirmation)
                         .edgesIgnoringSafeArea(.all)
-                    // Overlay on top of the camera view
-                    ScannerOverlay()
+                    ScannerOverlay(showConfirmation: $showConfirmation, detectedISBN: $detectedISBN, isPresentingScanner: $isPresentingScanner)
                 }
             }
 
-            // Show scanning status
-            if isScanning {
+            if isScanning && !showConfirmation {
                 Text("Scanning for ISBN...")
                     .foregroundColor(.gray)
                     .italic()
